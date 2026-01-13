@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Allergen Checker Prototype</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background: #0b0d12; color: #e9eef7; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; }
+    .card { background: #121725; border: 1px solid #222a3d; border-radius: 14px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    h1 { margin: 0 0 10px; font-size: 22px; letter-spacing: .2px; }
+    h2 { margin: 0 0 10px; font-size: 16px; opacity: .95; }
+    label { display: block; font-size: 12px; opacity: .85; margin: 12px 0 6px; }
+    input, select, textarea, button {
+      width: 100%; box-sizing: border-box;
+      background: #0e1320; color: #e9eef7;
+      border: 1px solid #2a3550; border-radius: 10px;
+      padding: 10px 12px; font-size: 14px;
+    }
+    textarea { min-height: 150px; resize: vertical; line-height: 1.35; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btnrow { display: flex; gap: 10px; margin-top: 12px; }
+    button { cursor: pointer; border: 1px solid #3b4a72; }
+    button.primary { background: #1a2550; }
+    button.ghost { background: transparent; }
+    button.small { padding: 9px 10px; font-size: 13px; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; border: 1px solid #2a3550; font-size: 12px; }
+    .status { font-weight: 700; }
+    .status.ok { color: #7CFCB2; }
+    .status.avoid { color: #FF7A7A; }
+    .status.unclear { color: #FFD37A; }
+    .muted { opacity: .75; font-size: 12px; line-height: 1.35; }
+    .table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    .table th, .table td { padding: 8px 8px; border-bottom: 1px solid #222a3d; vertical-align: top; }
+    .table th { text-align: left; font-size: 12px; opacity: .8; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid #2a3550; font-size: 12px; opacity: .95; }
+    .hi { background: rgba(255, 122, 122, .18); border-color: rgba(255, 122, 122, .5); }
+    .warn { background: rgba(255, 211, 122, .15); border-color: rgba(255, 211, 122, .55); }
+    .oktag { background: rgba(124, 252, 178, .12); border-color: rgba(124, 252, 178, .45); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .hl { padding: 2px 6px; border-radius: 6px; }
+    .hl.hit { background: rgba(255, 122, 122, .22); }
+    .hl.hidden { background: rgba(255, 211, 122, .18); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    .hint { margin-top: 6px; }
+    .split { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+    .divider { height: 1px; background: #222a3d; margin: 14px 0; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Allergen Checker (Prototype)</h1>
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+
+        <!-- NEW: Product search -->
+        <label>Product search (optional)</label>
+        <div class="split">
+          <div>
+            <input id="productQuery" placeholder='Try: "Colgate Cavity Protection" or "toothpaste"' />
+            <div class="muted hint" id="searchHint">Searches the local demo catalog (we can connect this to real sources later).</div>
+          </div>
+          <button class="primary small" id="searchBtn" style="width:auto;">Search</button>
+        </div>
+
+        <label>Search results</label>
+        <select id="searchResults">
+          <option value="">No results yet</option>
+        </select>
+
+        <div class="btnrow" style="margin-top:10px;">
+          <button class="primary small" id="useProductBtn" style="flex:1;">Use selected product</button>
+          <button class="ghost small" id="viewProductBtn" style="flex:1;">View product details</button>
+        </div>
+
+        <div id="productDetails" class="muted" style="display:none; margin-top:10px; border:1px solid #222a3d; padding:10px; border-radius:10px;">
+          <div><strong>Selected:</strong> <span id="pdName"></span></div>
+          <div><strong>Type:</strong> <span id="pdType"></span> &nbsp; <strong>Region:</strong> <span id="pdRegion"></span></div>
+          <div><strong>Source:</strong> <span id="pdSource"></span></div>
+          <div style="margin-top:8px;"><strong>Ingredients:</strong></div>
+          <div class="mono" id="pdIngredients" style="white-space:pre-wrap; margin-top:4px;"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row">
+          <div>
+            <label>Product type</label>
+            <select id="productType">
+              <option value="leaveon">Leave-on (lotion, makeup)</option>
+              <option value="rinseoff">Rinse-off (shampoo, cleanser)</option>
+              <option value="oral" selected>Oral care (toothpaste, mouthwash)</option>
+              <option value="fragrance">Fragrance</option>
+              <option value="household">Household / cleaning</option>
+            </select>
+          </div>
+          <div>
+            <label>Strictness</label>
+            <select id="strictness">
+              <option value="moderate" selected>Moderate (flag “hidden” as Unclear)</option>
+              <option value="strict">Strict (treat “hidden” as Avoid)</option>
+              <option value="flexible">Flexible (flag only, don’t fail)</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Ingredient list (optional if you use search)</label>
+        <textarea id="ingredients" placeholder="Paste ingredients here… or use the product search above."></textarea>
+
+        <div class="btnrow">
+          <button class="primary" id="analyzeBtn">Analyze</button>
+          <button class="ghost" id="loadExampleBtn">Load Colgate example</button>
+          <button class="ghost" id="clearBtn">Clear</button>
+        </div>
+
+        <p class="muted" style="margin-top:12px;">
+          Notes: This prototype matches allergens via direct ingredients, synonyms, and “hidden under” umbrella terms
+          like <span class="mono">Flavor</span> and <span class="mono">Fragrance/Parfum</span>. It cannot determine exact concentrations.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+
+        <div id="overall" class="pill" style="margin-bottom:10px;">
+          <span class="status unclear" id="statusText">Waiting…</span>
+          <span class="muted" id="statusReason">Search a product or paste ingredients, then click Analyze.</span>
+        </div>
+
+        <div id="hiddenSection" style="display:none;">
+          <div class="chips" id="hiddenChips"></div>
+          <p class="muted" id="hiddenNote" style="margin:8px 0 0;"></p>
+        </div>
+
+        <div id="matchesSection" style="display:none; margin-top: 12px;">
+          <h2 style="margin-top:0;">Matches</h2>
+          <table class="table" id="matchesTable">
+            <thead>
+              <tr>
+                <th>Allergen</th>
+                <th>Triggered by</th>
+                <th>Type</th>
+                <th>Confidence</th>
+                <th>Recommendation</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:12px;">
+          <h2>Ingredient view (highlighted)</h2>
+          <div id="ingredientView" class="muted mono" style="white-space: pre-wrap; line-height: 1.6;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/** ---------- Demo product catalog (local) ----------
+ * Replace / expand this catalog as you go.
+ * Later: swap searchCatalog() to call a real API.
+ */
+const PRODUCT_CATALOG = [
+  {
+    id: "colgate_cavity_protection_regular",
+    name: "Colgate Cavity Protection Toothpaste with Fluoride (Great Regular Flavor)",
+    type: "oral",
+    region: "US",
+    source: "Demo catalog (example)",
+    ingredientsText:
+`Active ingredient: Sodium Monofluorophosphate 0.76% (0.15% fluoride ion).
+Inactive ingredients: Dicalcium Phosphate Dihydrate, Water, Glycerin, Sodium Lauryl Sulfate, Cellulose Gum, Flavor, Tetrasodium Pyrophosphate, Sodium Saccharin.`
+  },
+  {
+    id: "generic_fragrance_free_lotion",
+    name: "Generic Fragrance-Free Lotion (Example)",
+    type: "leaveon",
+    region: "US",
+    source: "Demo catalog (example)",
+    ingredientsText:
+`Water, Glycerin, Caprylic/Capric Triglyceride, Cetyl Alcohol, Cetearyl Alcohol, Dimethicone, Carbomer, Sodium Hydroxide, Phenoxyethanol, Ethylhexylglycerin.`
+  },
+  {
+    id: "natural_beeswax_lip_balm",
+    name: "Natural Beeswax Lip Balm (Example)",
+    type: "leaveon",
+    region: "US",
+    source: "Demo catalog (example)",
+    ingredientsText:
+`Beeswax, Olive Oil, Coconut Oil, Propolis Extract, Natural Flavor.`
+  }
+];
+
+/**
+ * Allergen profile: your girlfriend’s list as rule objects.
+ * v1 intentionally conservative around “Flavor/Fragrance/Botanical”.
+ */
+const PROFILE = [
+  {
+    allergen: "Benzoic Acid",
+    avoid: true,
+    exact: ["benzoic acid"],
+    synonyms: ["sodium benzoate", "potassium benzoate", "calcium benzoate"],
+    hiddenUnder: [],
+    notes: "Often disclosed clearly."
+  },
+  {
+    allergen: "Colophonium (Rosin)",
+    avoid: true,
+    exact: ["colophonium", "colophony", "rosin", "colophane"],
+    synonyms: ["abietic acid", "tall oil rosin", "hydrogenated rosin"],
+    hiddenUnder: ["fragrance", "parfum", "botanical extract", "essential oil"],
+    notes: "Resin-related; may appear in adhesives/cosmetics."
+  },
+  {
+    allergen: "Fragrance Mix I/II",
+    avoid: false,
+    exact: ["fragrance mix i", "fragrance mix ii"],
+    synonyms: ["linalool","limonene","eugenol","geraniol","cinnamal","isoeugenol"],
+    hiddenUnder: ["fragrance", "parfum", "aroma", "flavor", "essential oil", "botanical extract"],
+    notes: "Often hidden under fragrance/flavor terms."
+  },
+  {
+    allergen: "Gold Sodium Thiosulfate",
+    avoid: true,
+    exact: ["gold sodium thiosulfate", "sodium aurothiosulfate"],
+    synonyms: [],
+    hiddenUnder: [],
+    notes: "Uncommon in consumer products."
+  },
+  {
+    allergen: "Propolis",
+    avoid: true,
+    exact: ["propolis", "propolis extract", "bee glue"],
+    synonyms: [],
+    hiddenUnder: ["botanical extract", "natural extract"],
+    notes: "Often in 'natural' lip/body products."
+  },
+  {
+    allergen: "Cobalt Chloride Hexahydrate",
+    avoid: true,
+    exact: ["cobalt chloride hexahydrate", "cobalt chloride"],
+    synonyms: [],
+    hiddenUnder: [],
+    notes: "Usually declared if present."
+  },
+  {
+    allergen: "Amerchol L-101 (Lanolin marker)",
+    avoid: true,
+    exact: ["amerchol l-101"],
+    synonyms: ["lanolin alcohol", "wool alcohol", "adeps lanae alcohol"],
+    hiddenUnder: ["lanolin", "wool wax"],
+    notes: "Lanolin derivatives common in moisturizers/lip products."
+  },
+  {
+    allergen: "Hydrocortisone-17-Butyrate",
+    avoid: true,
+    exact: ["hydrocortisone-17-butyrate", "hydrocortisone butyrate"],
+    synonyms: [],
+    hiddenUnder: [],
+    notes: "Prescription topical steroid."
+  },
+  {
+    allergen: "Bronopol",
+    avoid: true,
+    exact: ["bronopol", "2-bromo-2-nitropropane-1,3-diol", "2 bromo 2 nitropropane 1 3 diol"],
+    synonyms: ["bnpd"],
+    hiddenUnder: [],
+    notes: "Preservative; often disclosed by name."
+  },
+  {
+    allergen: "Hydroperoxides of Linalool",
+    avoid: false,
+    exact: ["hydroperoxides of linalool"],
+    synonyms: ["linalool"],
+    hiddenUnder: ["fragrance", "parfum", "flavor", "essential oil"],
+    notes: "Oxidation products; labels may only list linalool or umbrella terms."
+  },
+  {
+    allergen: "p-Phenylenediamine (PPD)",
+    avoid: false, // not strict
+    exact: ["p-phenylenediamine", "ppd"],
+    synonyms: [],
+    hiddenUnder: [],
+    notes: "Mostly hair dyes."
+  },
+  {
+    allergen: "Balsam of Peru (Myroxylon pereirae)",
+    avoid: true,
+    exact: ["balsam of peru", "myroxylon pereirae", "peru balsam"],
+    synonyms: ["peru balsam extract"],
+    hiddenUnder: ["fragrance", "parfum", "flavor", "aroma", "botanical extract", "essential oil"],
+    notes: "Often implicated via fragrance/flavor components."
+  }
+];
+
+const UMBRELLAS = [
+  { term: "fragrance", label: "Fragrance" },
+  { term: "parfum", label: "Parfum" },
+  { term: "aroma", label: "Aroma" },
+  { term: "flavor", label: "Flavor" },
+  { term: "essential oil", label: "Essential oil" },
+  { term: "botanical", label: "Botanical" },
+  { term: "extract", label: "Extract" }
+];
+
+function normalize(text) {
+  return (text || "")
+    .toLowerCase()
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitIngredients(raw) {
+  const cleaned = raw.replace(/\n/g, ",").replace(/•/g, ",");
+  return cleaned.split(/[,;]+/).map(s => normalize(s)).filter(Boolean);
+}
+
+function classifyRecommendation({ isDirectAvoid, isHidden, strictness }) {
+  if (isDirectAvoid) return "Avoid";
+  if (isHidden && strictness === "strict") return "Avoid";
+  if (isHidden && strictness === "moderate") return "Unclear";
+  if (isHidden && strictness === "flexible") return "Caution";
+  return "Likely OK";
+}
+
+function renderStatus(status, reason) {
+  const el = document.getElementById("statusText");
+  const why = document.getElementById("statusReason");
+  el.textContent = status;
+  why.textContent = reason || "";
+
+  el.classList.remove("ok","avoid","unclear");
+  if (status === "Likely OK") el.classList.add("ok");
+  else if (status === "Avoid") el.classList.add("avoid");
+  else el.classList.add("unclear");
+}
+
+function highlightIngredientView(raw, hits, hiddenHits) {
+  if (!raw.trim()) return "";
+  let out = raw;
+  const uniq = arr => Array.from(new Set(arr)).filter(Boolean);
+
+  const hitTerms = uniq(hits.map(h => h.triggeredBy)).sort((a,b)=>b.length-a.length);
+  const hiddenTerms = uniq(hiddenHits.map(h => h.term)).sort((a,b)=>b.length-a.length);
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  hitTerms.forEach(t => {
+    const re = new RegExp(`\\b${esc(t)}\\b`, "gi");
+    out = out.replace(re, match => `<span class="hl hit">${match}</span>`);
+  });
+
+  hiddenTerms.forEach(t => {
+    const re = new RegExp(`\\b${esc(t)}\\b`, "gi");
+    out = out.replace(re, match => `<span class="hl hidden">${match}</span>`);
+  });
+
+  return out;
+}
+
+/** --------- NEW: Catalog search + selection ---------- */
+function searchCatalog(query) {
+  const q = normalize(query);
+  if (!q) return [];
+
+  // Basic scoring: name contains query terms
+  const terms = q.split(" ").filter(Boolean);
+  const scored = PRODUCT_CATALOG.map(p => {
+    const name = normalize(p.name);
+    let score = 0;
+    terms.forEach(t => { if (name.includes(t)) score += 2; });
+    // small bonus for type keyword search
+    if (terms.includes("toothpaste") && p.type === "oral") score += 1;
+    return { p, score };
+  }).filter(x => x.score > 0);
+
+  scored.sort((a,b)=>b.score - a.score);
+  return scored.map(x => x.p);
+}
+
+function populateResults(products) {
+  const sel = document.getElementById("searchResults");
+  sel.innerHTML = "";
+
+  if (!products.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No matches found (try a different search)";
+    sel.appendChild(opt);
+    return;
+  }
+
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "Select a product…";
+  sel.appendChild(opt0);
+
+  products.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = `${p.name} — ${p.region}`;
+    sel.appendChild(opt);
+  });
+}
+
+function getSelectedProduct() {
+  const id = document.getElementById("searchResults").value;
+  return PRODUCT_CATALOG.find(p => p.id === id) || null;
+}
+
+function showProductDetails(p) {
+  const box = document.getElementById("productDetails");
+  if (!p) { box.style.display = "none"; return; }
+  document.getElementById("pdName").textContent = p.name;
+  document.getElementById("pdType").textContent = p.type;
+  document.getElementById("pdRegion").textContent = p.region;
+  document.getElementById("pdSource").textContent = p.source;
+  document.getElementById("pdIngredients").textContent = p.ingredientsText;
+  box.style.display = "block";
+}
+
+function useSelectedProduct() {
+  const p = getSelectedProduct();
+  if (!p) return;
+
+  // Auto-fill fields
+  document.getElementById("productType").value = p.type;
+  document.getElementById("ingredients").value = p.ingredientsText;
+
+  // Optional: auto-analyze immediately
+  analyze();
+}
+
+/** --------- Analysis ---------- */
+function analyze() {
+  const productType = document.getElementById("productType").value;
+  const strictness = document.getElementById("strictness").value;
+  const raw = document.getElementById("ingredients").value;
+
+  const list = splitIngredients(raw);
+  const matches = [];
+  const hiddenFlags = [];
+
+  UMBRELLAS.forEach(u => {
+    const present = list.some(i => i.includes(u.term));
+    if (present) hiddenFlags.push(u);
+  });
+
+  PROFILE.forEach(rule => {
+    const exactHits = rule.exact.filter(t => list.some(i => i === t || i.includes(t)));
+    const synHits = rule.synonyms.filter(t => list.some(i => i === t || i.includes(t)));
+
+    exactHits.forEach(t => matches.push({
+      allergen: rule.allergen,
+      triggeredBy: t,
+      type: "Exact",
+      confidence: "High",
+      directAvoid: rule.avoid || rule.allergen.includes("Fragrance Mix") || rule.allergen.includes("Balsam of Peru") || rule.allergen === "Hydroperoxides of Linalool"
+    }));
+
+    synHits.forEach(t => matches.push({
+      allergen: rule.allergen,
+      triggeredBy: t,
+      type: "Synonym/INCI",
+      confidence: rule.allergen.includes("Hydroperoxides of Linalool") ? "Medium" : "High",
+      directAvoid: rule.avoid || rule.allergen.includes("Fragrance Mix") || rule.allergen.includes("Balsam of Peru")
+    }));
+
+    const relevantUmbrellas = rule.hiddenUnder || [];
+    const triggeredHidden = hiddenFlags
+      .filter(u => relevantUmbrellas.some(r => normalize(r) === u.term || u.term.includes(normalize(r)) || normalize(r).includes(u.term)))
+      .map(u => u.term);
+
+    if (triggeredHidden.length) {
+      matches.push({
+        allergen: rule.allergen,
+        triggeredBy: triggeredHidden.join(", "),
+        type: "Hidden-under",
+        confidence: "Low",
+        directAvoid: false,
+        hidden: true
+      });
+    }
+  });
+
+  const anyDirectAvoid = matches.some(m => m.directAvoid && (m.type === "Exact" || m.type === "Synonym/INCI"));
+  const anyHidden = matches.some(m => m.type === "Hidden-under");
+
+  const status = classifyRecommendation({
+    isDirectAvoid: anyDirectAvoid,
+    isHidden: anyHidden,
+    strictness
+  });
+
+  let reason = "";
+  if (!raw.trim()) {
+    renderStatus("Unclear", "No ingredients provided. Use product search or paste ingredients.");
+    document.getElementById("ingredientView").innerHTML = "";
+    document.getElementById("matchesSection").style.display = "none";
+    document.getElementById("hiddenSection").style.display = "none";
+    return;
+  }
+
+  if (status === "Avoid") {
+    reason = anyDirectAvoid
+      ? "Direct allergen match found in ingredients."
+      : "Hidden-risk terms detected and strict mode is enabled.";
+  } else if (status === "Likely OK") {
+    reason = "No direct matches detected for this allergen profile.";
+  } else {
+    if (productType === "oral" && hiddenFlags.some(h => h.term === "flavor")) {
+      reason = "“Flavor” detected. Flavor components are often not disclosed and can contain fragrance-related allergens.";
+    } else if (anyHidden) {
+      reason = "Umbrella terms detected (e.g., fragrance/flavor/extract). These can conceal relevant allergens.";
+    } else {
+      reason = "Some matches require verification.";
+    }
+  }
+
+  renderStatus(status, reason);
+
+  const hiddenSection = document.getElementById("hiddenSection");
+  const hiddenChips = document.getElementById("hiddenChips");
+  const hiddenNote = document.getElementById("hiddenNote");
+  hiddenChips.innerHTML = "";
+  if (hiddenFlags.length) {
+    hiddenSection.style.display = "block";
+    hiddenFlags.forEach(h => {
+      const span = document.createElement("span");
+      span.className = "tag warn";
+      span.textContent = `Umbrella: ${h.label}`;
+      hiddenChips.appendChild(span);
+    });
+    hiddenNote.textContent = "Umbrella terms may conceal specific sensitizers. Consider verifying with manufacturer or choosing fragrance-free/flavor-transparent options.";
+  } else {
+    hiddenSection.style.display = "none";
+  }
+
+  const matchesSection = document.getElementById("matchesSection");
+  const tbody = document.querySelector("#matchesTable tbody");
+  tbody.innerHTML = "";
+
+  if (matches.length) {
+    matchesSection.style.display = "block";
+    matches.forEach(m => {
+      const rec = (m.type === "Hidden-under")
+        ? (strictness === "strict" ? "Avoid" : (strictness === "flexible" ? "Caution" : "Unclear"))
+        : (m.directAvoid ? "Avoid" : "Caution");
+
+      const recClass = rec === "Avoid" ? "hi" : (rec === "Likely OK" ? "oktag" : "warn");
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${m.allergen}</td>
+        <td><span class="mono">${m.triggeredBy}</span></td>
+        <td>${m.type}</td>
+        <td>${m.confidence}</td>
+        <td><span class="tag ${recClass}">${rec}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } else {
+    matchesSection.style.display = "none";
+  }
+
+  document.getElementById("ingredientView").innerHTML = highlightIngredientView(
+    raw,
+    matches.filter(m => m.type !== "Hidden-under"),
+    hiddenFlags
+  );
+}
+
+/** --------- Wiring ---------- */
+document.getElementById("analyzeBtn").addEventListener("click", analyze);
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+  document.getElementById("ingredients").value = "";
+  document.getElementById("productQuery").value = "";
+  document.getElementById("searchResults").innerHTML = `<option value="">No results yet</option>`;
+  showProductDetails(null);
+  renderStatus("Unclear", "Search a product or paste ingredients, then click Analyze.");
+  document.getElementById("ingredientView").innerHTML = "";
+  document.getElementById("matchesSection").style.display = "none";
+  document.getElementById("hiddenSection").style.display = "none";
+});
+
+document.getElementById("loadExampleBtn").addEventListener("click", () => {
+  document.getElementById("productQuery").value = "Colgate Cavity Protection";
+  const res = searchCatalog("Colgate Cavity Protection");
+  populateResults(res);
+  // auto-select first result if present
+  if (res.length) {
+    document.getElementById("searchResults").value = res[0].id;
+    showProductDetails(res[0]);
+    useSelectedProduct();
+  }
+});
+
+document.getElementById("searchBtn").addEventListener("click", () => {
+  const q = document.getElementById("productQuery").value;
+  const res = searchCatalog(q);
+  populateResults(res);
+  showProductDetails(null);
+});
+
+document.getElementById("searchResults").addEventListener("change", () => {
+  const p = getSelectedProduct();
+  showProductDetails(p);
+});
+
+document.getElementById("useProductBtn").addEventListener("click", useSelectedProduct);
+
+document.getElementById("viewProductBtn").addEventListener("click", () => {
+  const box = document.getElementById("productDetails");
+  box.style.display = (box.style.display === "none" || !box.style.display) ? "block" : "none";
+});
+
+// Initial state
+renderStatus("Unclear", "Search a product or paste ingredients, then click Analyze.");
+</script>
+</body>
+</html>
